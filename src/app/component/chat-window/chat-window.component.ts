@@ -5,7 +5,6 @@ import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { EventSystem } from '@udonarium/core/system';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { ChatTabSettingComponent } from 'component/chat-tab-setting/chat-tab-setting.component';
-import { PlayerPaletteControlComponent } from 'component/player-palette-control/player-palette-control.component';
 import { ChatMessageService } from 'service/chat-message.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
@@ -42,6 +41,10 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
   isLogOnly:boolean = true;
   localFontsize:number = 14;
   bgColor:string = "black";
+  get isBlack():boolean {
+    return (this.bgColor === 'black')
+  }
+
   noControl = true;
   _disableControl : boolean = false;
   get disableControl(): boolean { return this._disableControl };
@@ -49,6 +52,14 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.noControl) this._disableControl = true;
     this._disableControl = control;
   };
+
+  isEdit:boolean = false;
+  editMessage:ChatMessage = null;
+
+  toggleEdit() {
+    this.isEdit = false;
+    this.editMessage = null;
+  }
 
   private _chatTabidentifier: string = '';
   get chatTabidentifier(): string { return this._chatTabidentifier; }
@@ -105,6 +116,11 @@ export class ChatWindowComponent implements OnInit, OnDestroy, AfterViewInit {
 
   ngOnDestroy() {
     EventSystem.unregister(this);
+  }
+
+  messageEdit(value: { chatMessage: ChatMessage} ) {
+    this.editMessage = value.chatMessage;
+    this.isEdit = true;
   }
 
   // @TODO やり方はもう少し考えた方がいいい

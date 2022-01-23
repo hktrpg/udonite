@@ -1,11 +1,14 @@
-import { Component, OnInit , ViewChild, ElementRef,AfterViewInit } from '@angular/core';
+import { Component, OnInit , AfterViewInit } from '@angular/core';
 import { BillBoardCard } from '@udonarium/bill-board-card';
+import { ImageFile } from '@udonarium/core/file-storage/image-file';
+import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
+import { ImageViewComponent } from 'component/image-view/image-view.component';
+import { FileSelecterComponent } from 'component/file-selecter/file-selecter.component';
 import { BillBoardService } from 'service/bill-board.service';
 import { PanelService } from 'service/panel.service';
 import { PlayerService } from 'service/player.service';
 import { ModalService } from 'service/modal.service';
-import { TextViewComponent } from 'component/text-view/text-view.component';
-import { PeerCursor } from '@udonarium/peer-cursor';
+import { RoomService } from 'service/room.service';
 import { EventSystem } from '@udonarium/core/system';
 import { Buffer } from 'buffer';
 
@@ -17,24 +20,19 @@ import { Buffer } from 'buffer';
 export class BillBoardCardComponent implements OnInit,AfterViewInit {
   isSecret:boolean = false;
   isEdit:boolean = false;
+  isImage:boolean = false;
   dataType:number = 0;
   authType:string[] = ['全体に公開','全体に公開(編集不可)','公開範囲を制限'];
   readOnly:boolean = false;
   password:string = "";
   title:string = "";
   text:string = "";
-  allowPlayerName :string[];
-  peers:string[] = [];
+  allowPlayerName :string[] = [];
+  players:string[] = [];
+  imageIdentifier:string = ""
 
+  player:string = "";
 
-  peer:string = "";
-
-  get otherPeerName(): { name: string, color: string }[]  {
-    return [];
-  }
-  get otherPeers() {
-    return this.playerService.otherPeers;
-  }
   _card:BillBoardCard;
   get card():BillBoardCard { return this._card;}
   set card(card :BillBoardCard) {
@@ -49,24 +47,42 @@ export class BillBoardCardComponent implements OnInit,AfterViewInit {
     else {
       this.text = this.decode(card.text);
     }
-    this.peers = card.allowPeers;
-    this.allowPlayerName = this.peers.map( identifier => {
-      let peer = this.playerService.getPeer(identifier);
-      if (peer) return peer.name;
+    this.players = card.allowPlayers;
+    this.allowPlayerName = this.playerService.otherPlayers
+      .filter( player => 
+        this.players.includes(player.playerId)
+      )
+      .map( player => {
+        return player.name
+      });
+    if (card.isImage) {
+      this.isImage = true;
+      this.imageIdentifier = card.imageIdentifier
+    }
+  }
+
+  get imageurl(): string { 
+    let imagefile = ImageStorage.instance.get(this.imageIdentifier)
+    if (imagefile)  return imagefile.url;
+    return ""
+  }
+
+  changeImage() {
+    let currentImageIdentifires: string[] = [];
+    if (this.imageIdentifier) currentImageIdentifires = [this.imageIdentifier];
+    this.modalService.open<string>(FileSelecterComponent, { currentImageIdentifires: currentImageIdentifires }).then(value => {
+      if (!value) return;
+      this.imageIdentifier = value;
     });
   }
 
   create() {
     let identifier :string;
     if (this.dataType) {
-      if (!this.password) {
-        this.modalService.open(TextViewComponent, { title: 'パスワードが設定されていません', text: 'パスワードが設定されていません。\n接続が切れたとき・部屋を再作成した時に権限情報は全て失われるため、パスワードが必要になります。' });
-        return;
-      }
-      identifier = this.billBoardService.add(this.title ,this.encode(this.text), this.dataType,this.getHash(this.password),this.peers);  
+      identifier = this.billBoardService.add(this.title ,this.encode(this.text), this.dataType,this.players,this.imageIdentifier);  
     }
     else {
-      identifier = this.billBoardService.add(this.title ,this.encode(this.text), this.dataType);  
+      identifier = this.billBoardService.add(this.title ,this.encode(this.text), this.dataType,[],this.imageIdentifier);  
     } 
     EventSystem.call('BOARD_NEW', identifier);
     this.close();
@@ -90,41 +106,25 @@ export class BillBoardCardComponent implements OnInit,AfterViewInit {
     this.card.title = this.title;
     this.card.text = this.encode(this.text);
     this.card.dataType = String(this.dataType);
+    if (this.isImage) this.card.imageIdentifier = this.imageIdentifier;
+    else this.imageIdentifier = ""; 
     this.isEdit = false;
     this.panelService.height -= 50 ;
     EventSystem.call('BOARD_UPDATE', this.card.identifier);
 
   }
 
-  addPeer() {
-    if (!this.peers.includes(this.peer)) {
-      this.peers.push(this.peer);
-      this.allowPlayerName.push(this.playerService.getPeer(this.peer).name);
+  addPlayer() {
+    if (!this.players.includes(this.player)) {
+      this.players.push(this.player);
+      this.allowPlayerName.push(this.playerService.getPlayerById(this.player).name);
     }
-  }
-
-  passwordAuth() {
-    if (this.card.ownerPassword == this.getHash(this.password)) {
-      this.readOnly = false;
-      this.isSecret = false;
-      this.text = this.decode(this.card.text);
-      this.card.ownerPeers.push(this.playerService.myPeer.identifier);
-    }
-    else {
-      this.modalService.open(TextViewComponent, { title: '認証失敗', text: 'パスワードが違います' });
-    }
-    this.password = '';
   }
 
   auth():boolean {
-    return ( (this.card.ownerPeers.includes(this.playerService.myPeer.identifier)) 
-     || (this.card.allowPeers.includes(this.playerService.myPeer.identifier)) );
+    return ( (this.card.ownerPlayer.includes(this.playerService.myPlayer.playerId)) 
+     || (this.card.allowPlayers.includes(this.playerService.myPlayer.playerId)) );
   }
-
-  getHash(password: string) {
-    return this.playerService.getHash(password);
-  }
-
 
   encode(text: string):string {
     return Buffer.from(text).toString('base64') ;
@@ -133,10 +133,16 @@ export class BillBoardCardComponent implements OnInit,AfterViewInit {
   decode(text: string):string {
     return Buffer.from(text, 'base64').toString(); ;
   }
+
+  viewImg() {
+    this.modalService.open<string>(ImageViewComponent, { title: this.title,imageIdentifier: this.imageIdentifier })
+  }
+
   constructor(
     private modalService: ModalService,
     private panelService: PanelService,
     private playerService: PlayerService,
+    private roomService: RoomService,
     private billBoardService: BillBoardService
   ) { 
   }

@@ -1,13 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 
-import { ConnectService } from './connect.service';
+import { LoadDataService } from './load-data.service';
 
-describe('ConnectService', () => {
-  let service: ConnectService;
+describe('LoadDataService', () => {
+  let service: LoadDataService;
 
   beforeEach(() => {
     TestBed.configureTestingModule({});
-    service = TestBed.inject(ConnectService);
+    service = TestBed.inject(LoadDataService);
   });
 
   it('should be created', () => {

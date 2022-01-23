@@ -2,30 +2,47 @@ import { SyncObject } from './core/synchronize-object/decorator';
 import { InnerXml } from './core/synchronize-object/object-serializer';
 import { SyncVar } from './core/synchronize-object/decorator';
 import { ObjectNode } from './core/synchronize-object/object-node';
+import { Player } from './player';
 
 @SyncObject('room-admin')
 export class RoomAdmin extends ObjectNode implements InnerXml{
 
-//この情報は個別の部屋に紐付け保存させない
-  @SyncVar() adminPassword:string;
-  @SyncVar() adminPeers:string[];
-  @SyncVar() disableTableLoad:boolean;
-  @SyncVar() disableCharacterLoad:boolean;
+  @SyncVar() adminPlayer:string[];
+  @SyncVar() disableRoomLoad:boolean;
+  @SyncVar() disableObjectLoad:boolean;
+  @SyncVar() disableTabletopLoad:boolean;
+  @SyncVar() disableImageLoad:boolean;
+  @SyncVar() disableAudioLoad:boolean;
   @SyncVar() disableTableSetting:boolean;
   @SyncVar() disableTabSetting:boolean;
   @SyncVar() disableAllDataSave:boolean;
   @SyncVar() disableSeparateDataSave:boolean;
 
+  @SyncVar() roomLoad:boolean; 
   @SyncVar() gameType:string;
   @SyncVar() chatTab:string;
   @SyncVar() diceLog:boolean;
   @SyncVar() cardLog:boolean;
-
+  isLobby:boolean = true;
+  myPlayerID:string = '';
   private static _instance:RoomAdmin;
 
   private static defaultSetting = {
-    adminPassword: "", 
-    adminPeers: [], 
+    adminPlayer: [], 
+    disableRoomLoad: true,
+    disableObjectLoad: false,
+    disableTabletopLoad: false,
+    disableImageLoad: false,
+    disableAudioLoad: false,
+    disableTableSetting: false,
+    disableTabSetting: false,
+    disableAllDataSave: false,
+    disableSeparateDataSave: false,
+    roomLoad: true,
+    gameType: "",
+    chatTab: "",
+    diceLog: false,
+    cardLog: false
   }
 
   static init() {
@@ -37,28 +54,40 @@ export class RoomAdmin extends ObjectNode implements InnerXml{
       for (let key in RoomAdmin.defaultSetting) {
         admin.setAttribute(key, RoomAdmin.defaultSetting[key]);
       }
-      admin.gameType = "";
-      admin.chatTab = "";
-      admin.diceLog = false;
-      admin.cardLog = false;
       RoomAdmin._instance.appendChild(admin);
     }
   }
 
-  private get getchild(): RoomAdmin { 
-    let roomAdmin:RoomAdmin[] = this.children as RoomAdmin[];
-    return roomAdmin[0];
-  }
-  private set getchild(roomAdmin :RoomAdmin) {
-    let _roomAdmin:RoomAdmin[] = this.children as RoomAdmin[];
-    _roomAdmin[0] = roomAdmin;
+  private get getchild(): ObjectNode[] {  
+    return this.children as ObjectNode[];
   }
 
   static get instance(): RoomAdmin {
-    return RoomAdmin._instance.getchild;
+    return RoomAdmin._instance;
   }
-  static set instance(roomAdmin : RoomAdmin) {
-    RoomAdmin._instance.getchild = roomAdmin;
+ 
+  static get setting(): RoomAdmin {
+     return RoomAdmin.instance.getchild.find(object => 
+      (object instanceof RoomAdmin)
+    ) as RoomAdmin;
   }
+
+  static get players(): Player[] {
+    return RoomAdmin.instance.getchild.filter(object => 
+      (object instanceof Player)
+    ) as Player[];
+  }
+
+  static get auth() :boolean{
+    if (RoomAdmin.setting.adminPlayer.length < 1) return true;
+    return RoomAdmin.setting.adminPlayer.includes(RoomAdmin.setting.myPlayerID);
+  }
+
+  static findPlayerById(playerId: string): Player {
+    return RoomAdmin.players.find( player =>
+      player.playerId === playerId
+    );
+  }
+
 
 }

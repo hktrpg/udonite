@@ -1,13 +1,8 @@
 import { AfterViewInit, Component, NgZone, OnDestroy} from '@angular/core';
 
-import { ChatTabList } from '@udonarium/chat-tab-list';
-import { CounterList } from '@udonarium/counter-list';
-import { IRound } from '@udonarium/round';
-import { RoomAdmin } from '@udonarium/room-admin';
-import { BillBoard } from '@udonarium/bill-board';
-import { AudioPlayer } from '@udonarium/core/file-storage/audio-player';
 import { AudioSharingSystem } from '@udonarium/core/file-storage/audio-sharing-system';
 import { AudioStorage } from '@udonarium/core/file-storage/audio-storage';
+import { EventSystem, Network } from '@udonarium/core/system';
 import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { ImageSharingSystem } from '@udonarium/core/file-storage/image-sharing-system';
@@ -16,27 +11,29 @@ import { ObjectFactory } from '@udonarium/core/synchronize-object/object-factory
 import { ObjectSerializer } from '@udonarium/core/synchronize-object/object-serializer';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { ObjectSynchronizer } from '@udonarium/core/synchronize-object/object-synchronizer';
-import { EventSystem, Network } from '@udonarium/core/system';
+
+import { BillBoard } from '@udonarium/bill-board';
+import { ChatTabList } from '@udonarium/chat-tab-list';
+import { CounterList } from '@udonarium/counter-list';
+import { CutInList } from '@udonarium/cut-in-list';
 import { DataSummarySetting } from '@udonarium/data-summary-setting';
-import { Jukebox } from '@udonarium/Jukebox';
-import { PeerCursor } from '@udonarium/peer-cursor';
-import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
-import { TextViewComponent } from 'component/text-view/text-view.component';
-import { AppConfig, AppConfigService } from 'service/app-config.service';
-import { ModalService } from 'service/modal.service';
-import { PointerDeviceService } from 'service/pointer-device.service';
-import { DiceBotService } from 'service/dice-bot.service';
-import { RoomService } from 'service/room.service';
-import { StandImageService } from 'service/stand-image.service';
-import { GameCharacter } from '@udonarium/game-character';
-import { DataElement } from '@udonarium/data-element';
 import { DiceRollTable } from '@udonarium/dice-roll-table';
 import { DiceRollTableList } from '@udonarium/dice-roll-table-list';
-
 import { ImageTag } from '@udonarium/image-tag';
-import { CutInService } from 'service/cut-in.service';
-import { CutIn } from '@udonarium/cut-in';
-import { CutInList } from '@udonarium/cut-in-list';
+import { IRound } from '@udonarium/round';
+import { ObjectTemplate } from '@udonarium/object-template';
+import { PeerCursor } from '@udonarium/peer-cursor';
+import { RoomAdmin } from '@udonarium/room-admin';
+
+import { AppConfig, AppConfigService } from 'service/app-config.service';
+import { DiceBotService } from 'service/dice-bot.service';
+import { LoadDataService } from 'service/load-data.service';
+import { ModalService } from 'service/modal.service';
+import { PointerDeviceService } from 'service/pointer-device.service';
+import { PlayerService } from 'service/player.service';
+import { RoomService } from 'service/room.service';
+
+import { TextViewComponent } from 'component/text-view/text-view.component';
 
 @Component({
   selector: 'app-root',
@@ -48,18 +45,18 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   private immediateUpdateTimer: NodeJS.Timer = null;
   private lazyUpdateTimer: NodeJS.Timer = null;
   get isLobby():boolean {
-    return this.roomService.isLobby;
+    return this.roomService.roomAdmin.isLobby;
   }
 
-  constructor(
+  constructor(  
     private modalService: ModalService,
     private diceBotService: DiceBotService,
     private pointerDeviceService: PointerDeviceService,
     private appConfigService: AppConfigService,
     private ngZone: NgZone,
-    private standImageService: StandImageService,
+    private playerService: PlayerService,
     private roomService: RoomService,
-    private cutInService: CutInService
+    private loadDataService: LoadDataService
   ) {
 
     this.ngZone.runOutsideAngular(() => {
@@ -77,19 +74,15 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     });
     this.appConfigService.initialize();
     this.pointerDeviceService.initialize();
+    this.loadDataService.initialize();    
 
     IRound.init();
     BillBoard.init();
     RoomAdmin.init();
+    ObjectTemplate.init();
     CounterList.instance.initialize();
     ChatTabList.instance.initialize();
     DataSummarySetting.instance.initialize();
-
-    let jukebox: Jukebox = new Jukebox('Jukebox');
-    jukebox.initialize();
-
-    let soundEffect: SoundEffect = new SoundEffect('SoundEffect');
-    soundEffect.initialize();
 
     ChatTabList.instance.addChatTab('メインタブ', 'MainTab');
     ChatTabList.instance.addChatTab('サブタブ', 'SubTab');
@@ -114,52 +107,15 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     let standNoIconImage = ImageStorage.instance.add(fileContext);
     ImageTag.create(standNoIconImage.identifier).tag = '*default スタンド';
 
-    AudioPlayer.resumeAudioContext();
-    PresetSound.dicePick = AudioStorage.instance.add('./assets/sounds/soundeffect-lab/shoulder-touch1.mp3').identifier;
-    PresetSound.dicePut = AudioStorage.instance.add('./assets/sounds/soundeffect-lab/book-stack1.mp3').identifier;
-    PresetSound.diceRoll1 = AudioStorage.instance.add('./assets/sounds/on-jin/spo_ge_saikoro_teburu01.mp3').identifier;
-    PresetSound.diceRoll2 = AudioStorage.instance.add('./assets/sounds/on-jin/spo_ge_saikoro_teburu02.mp3').identifier;
-    PresetSound.cardDraw = AudioStorage.instance.add('./assets/sounds/soundeffect-lab/card-turn-over1.mp3').identifier;
-    PresetSound.cardPick = AudioStorage.instance.add('./assets/sounds/soundeffect-lab/shoulder-touch1.mp3').identifier;
-    PresetSound.cardPut = AudioStorage.instance.add('./assets/sounds/soundeffect-lab/book-stack1.mp3').identifier;
-    PresetSound.cardShuffle = AudioStorage.instance.add('./assets/sounds/soundeffect-lab/card-open1.mp3').identifier;
-    PresetSound.piecePick = AudioStorage.instance.add('./assets/sounds/soundeffect-lab/shoulder-touch1.mp3').identifier;
-    PresetSound.piecePut = AudioStorage.instance.add('./assets/sounds/soundeffect-lab/book-stack1.mp3').identifier;
-    PresetSound.blockPick = AudioStorage.instance.add('./assets/sounds/tm2/tm2_pon002.wav').identifier;
-    PresetSound.blockPut = AudioStorage.instance.add('./assets/sounds/tm2/tm2_pon002.wav').identifier;
-    PresetSound.lock = AudioStorage.instance.add('./assets/sounds/tm2/tm2_switch001.wav').identifier;
-    PresetSound.unlock = AudioStorage.instance.add('./assets/sounds/tm2/tm2_switch001.wav').identifier;
-    PresetSound.sweep = AudioStorage.instance.add('./assets/sounds/tm2/tm2_swing003.wav').identifier;
-    PresetSound.puyon = AudioStorage.instance.add('./assets/sounds/soundeffect-lab/puyon1.mp3').identifier;
-    PresetSound.surprise = AudioStorage.instance.add('./assets/sounds/otologic/Onmtp-Surprise02-1.mp3').identifier;
-    PresetSound.coinToss = AudioStorage.instance.add('./assets/sounds/niconicomons/nc146227.mp3').identifier;
-    PresetSound.alarm = AudioStorage.instance.add('./assets/sounds/alarm.mp3').identifier;
+    
+    fileContext = ImageFile.createEmpty('testTableBackgroundImage_image').toContext();
+    fileContext.url = './assets/images/BG10a_80.jpg';
+    let testBgFile: ImageFile = ImageStorage.instance.add(fileContext);
+    ImageTag.create(testBgFile.identifier).tag = '*default テーブル';
 
-    AudioStorage.instance.get(PresetSound.dicePick).isHidden = true;
-    AudioStorage.instance.get(PresetSound.dicePut).isHidden = true;
-    AudioStorage.instance.get(PresetSound.diceRoll1).isHidden = true;
-    AudioStorage.instance.get(PresetSound.diceRoll2).isHidden = true;
-    AudioStorage.instance.get(PresetSound.cardDraw).isHidden = true;
-    AudioStorage.instance.get(PresetSound.cardPick).isHidden = true;
-    AudioStorage.instance.get(PresetSound.cardPut).isHidden = true;
-    AudioStorage.instance.get(PresetSound.cardShuffle).isHidden = true;
-    AudioStorage.instance.get(PresetSound.piecePick).isHidden = true;
-    AudioStorage.instance.get(PresetSound.piecePut).isHidden = true;
-    AudioStorage.instance.get(PresetSound.blockPick).isHidden = true;
-    AudioStorage.instance.get(PresetSound.blockPut).isHidden = true;
-    AudioStorage.instance.get(PresetSound.lock).isHidden = true;
-    AudioStorage.instance.get(PresetSound.unlock).isHidden = true;
-    AudioStorage.instance.get(PresetSound.sweep).isHidden = true
-    AudioStorage.instance.get(PresetSound.puyon).isHidden = true;
-    AudioStorage.instance.get(PresetSound.surprise).isHidden = true;
-    AudioStorage.instance.get(PresetSound.coinToss).isHidden = true;
-    AudioStorage.instance.get(PresetSound.alarm).isHidden = true;
+    this.playerService.playerCreate(noneIconImage.identifier);
 
-    PeerCursor.createMyCursor();
-    if (!PeerCursor.myCursor.name) PeerCursor.myCursor.name = 'プレイヤー';
-    PeerCursor.myCursor.imageIdentifier = noneIconImage.identifier;
-
-    EventSystem.register(this)
+     EventSystem.register(this)
       .on('UPDATE_GAME_OBJECT', event => { this.lazyNgZoneUpdate(event.isSendFromSelf); })
       .on('DELETE_GAME_OBJECT', event => { this.lazyNgZoneUpdate(event.isSendFromSelf); })
       .on('SYNCHRONIZE_AUDIO_LIST', event => { if (event.isSendFromSelf) this.lazyNgZoneUpdate(false); })
@@ -180,7 +136,6 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       .on('OPEN_NETWORK', event => {
         console.log('OPEN_NETWORK', event.data.peerId);
         PeerCursor.myCursor.peerId = Network.peerContext.peerId;
-        PeerCursor.myCursor.userId = Network.peerContext.userId;
       })
       .on('CLOSE_NETWORK', event => {
         console.log('CLOSE_NETWORK', event.data.peerId);
@@ -199,38 +154,11 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       })
       .on('DISCONNECT_PEER', event => {
         this.lazyNgZoneUpdate(event.isSendFromSelf);
-      })
-      .on('PLAY_CUT_IN', -1000, event => {
-        let cutIn = ObjectStore.instance.get<CutIn>(event.data.identifier);
-        this.cutInService.play(cutIn, event.data.secret ? event.data.secret : false, event.data.test ? event.data.test : false, event.data.sender);
-      })
-      .on('STOP_CUT_IN', -1000, event => {
-        this.cutInService.stop(event.data.identifier);
-      })
-      .on('PLAY_ALARM', -1000, event => {
-        if (!event.data.identifier || event.data.identifier == PeerCursor.myCursor.peerId ) {
-          setTimeout(() => {
-            SoundEffect.play(PresetSound.alarm);
-          },event.data.time); 
-        }
-      })
-      .on('POPUP_STAND_IMAGE', -1000, event => {
-        let standElement = ObjectStore.instance.get<DataElement>(event.data.standIdentifier);
-        let gameCharacter = ObjectStore.instance.get<GameCharacter>(event.data.characterIdentifier);
-        this.standImageService.show(gameCharacter, standElement, event.data.color ? event.data.color : null, event.data.secret);
-      })
-      .on('FAREWELL_STAND_IMAGE', -1000, event => {
-        this.standImageService.farewell(event.data.characterIdentifier);
-      })
-      .on('DELETE_STAND_IMAGE', -1000, event => {
-        this.standImageService.destroy(event.data.characterIdentifier, event.data.identifier);
-      })
-      .on('DESTORY_STAND_IMAGE_ALL', -1000, event => {
-        this.standImageService.destroyAll();
       });
   }
 
   ngAfterViewInit() {
+    this.roomService.roomInit();
   }
 
   ngOnDestroy() {

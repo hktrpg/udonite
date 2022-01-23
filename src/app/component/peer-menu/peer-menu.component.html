@@ -4,7 +4,7 @@
       プレイヤーアイコン
     </div>
     <div class="item-data">
-      <div *ngIf="myPeer.image" class="image cover" [style.background-image]="'url(' + myPeer.image.url + ')' | safe: 'style' "
+      <div *ngIf="player.image" class="image cover" [style.background-image]="'url(' + player.image.url + ')' | safe: 'style' "
       (click)="changeIcon()">
       </div>
       <button (click)="changeIcon()">変更</button>
@@ -15,7 +15,7 @@
       あなたの色
     </div>
     <div class="item-data">
-      <input type="color" style="width:2em; height:2.5em;" [(ngModel)]="myPeerColor">
+      <input type="color" style="width:2em; height:2.5em;" [(ngModel)]="myColor">
       <button (click)="colorReset()" >初期化</button>
     </div>
   </div>
@@ -24,7 +24,7 @@
       ニックネーム
     </div>
     <div class="item-data">
-      <input [(ngModel)]="myPeerName" [style.color]="myPeerColor" style="font-weight: bolder;" placeholder="ニックネーム" />
+      <input [(ngModel)]="myName" [style.color]="myColor" style="font-weight: bolder;" placeholder="ニックネーム" />
     </div>
   </div>
   <div class="flex-item">
@@ -32,9 +32,7 @@
     あなたのID
     </div>
     <div class="item-data">
-      <div *ngIf="networkService.isOpen; else disconnect">
-        <span>{{ networkService.peerContext.userId }}</span>
-      </div>
+    {{player.playerId}}
     </div>
   </div>
   <div class="flex-item">
@@ -42,36 +40,23 @@
       bcdiceサーバ
     </div>
     <div class="item-data">
-      <span *ngIf="this.diceBotService.isConnect; else disconnect">接続済み</span>
-    </div>
-  </div>
-  <div class="flex-item" *ngIf="networkService.peerContext.isRoom">
-    <div class="item-name">
-      ルーム名
-    </div>
-    <div class="item-data">
-      <span style="font-weight: bold;">{{networkService.peerContext.roomName}}/{{networkService.peerContext.roomId}}</span>
-    </div>
-  </div>
-  <div class="flex-item" *ngIf="networkService.peerContext.isRoom">
-    <div class="item-name">
-      パスワード
-    </div>
-    <div class="item-data">
-      {{networkService.peerContext.password}}
+      <span *ngIf="diceBotService.isConnect; else disconnect">version {{diceBotService.api.bcDiceVersion}}</span>
     </div>
   </div>
 </div>
 <hr/>
-<div *ngFor="let context of networkService.peerContexts">
-  <div>
-    <span *ngIf="!context.isOpen">[接続中]</span>
-    <span style="font-size: 12px;" [ngStyle]="{'color':peerStatus(context.peerId)}" class="material-icons">
-      light_mode
-    </span>
-    <span>他の参加者：{{findUserId(context.peerId)}} [<b [style.color]="findPeerColor(context.peerId)">{{findPeerName(context.peerId)}}</b>]</span>
+<ng-container *ngIf="networkService.peerContext.isRoom"> 
+  ログイン中のプレイヤー
+  <div *ngFor="let peer of otherPeers">
+    <div>
+      <span style="font-size: 12px;" [ngStyle]="{'color':peerStatus(peer.peerId)}" class="material-icons">
+        light_mode
+      </span>
+      <span>[{{peer.player.playerId}}] <b [style.color]="peer.player.color">{{peer.player.name}}</b></span>
+      <span *ngIf="peer.peerId == myPeer">[あなた]</span>
+    </div>
   </div>
-</div>
+</ng-container>
 <div><span style="font-size: 12px;">{{help}}</span></div>
 <ng-template #disconnect>
   <span style="font-weight: bold;">未接続</span>

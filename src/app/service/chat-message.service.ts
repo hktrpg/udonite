@@ -3,13 +3,14 @@ import { Injectable } from '@angular/core';
 import { GameCharacterService } from 'service/game-character.service';
 import { StandService } from 'service/stand.service';
 import { PlayerService } from 'service/player.service';
+import { RoomService } from './room.service';
 
 import { ChatMessageContext } from '@udonarium/chat-message';
 import { ChatTab } from '@udonarium/chat-tab';
 import { ChatTabList } from '@udonarium/chat-tab-list';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { Network } from '@udonarium/core/system';
-import { PeerCursor } from '@udonarium/peer-cursor';
+//import { PeerCursor } from '@udonarium/peer-cursor';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 
 const HOURS = 60 * 60 * 1000;
@@ -24,7 +25,8 @@ export class ChatMessageService {
   constructor(
     private gameCharacterService:  GameCharacterService,
     private standService:  StandService,
-    private playerService:  PlayerService
+    private playerService:  PlayerService,
+    private roomService: RoomService
   ) { }
 
   get chatTabs(): ChatTab[] {
@@ -55,13 +57,11 @@ export class ChatMessageService {
   {
     let chatSet = this.gameCharacterService.chatSet(sendFrom,isUseFaceIcon,text,standName);
     let color = chatSet.color ? chatSet.color : this.myColor; 
-    let name,newTo :string;
+    let name :string;
     if (sendTo) {
-      newTo = this.findId(sendTo);
       name = this.makeMessageName(chatSet.name , sendTo);
     }
     else {
-      newTo = "";
       name = chatSet.name;
     } 
     if (isUseStandImage && chatSet.standInfo) {
@@ -69,8 +69,8 @@ export class ChatMessageService {
     }
     this.standService.cutIn(text,sendTo);
     let chatMessage: ChatMessageContext = {
-      from: Network.peerContext.userId,
-      to: newTo,
+      from: this.playerService.myPlayer.playerId,
+      to: sendTo,
       name: name,
       imageIdentifier: chatSet.imageIdentifier,
       timestamp: this.calcTimeStamp(chatTab),
@@ -91,7 +91,7 @@ export class ChatMessageService {
 
   systemSend(chatTab: ChatTab, text: string) {
     let chatMessage: ChatMessageContext = {
-      from: Network.peerContext.userId,
+      from: this.playerService.myPlayer.playerId,
       name: 'System',
       timestamp: this.calcTimeStamp(chatTab),
       tag: 'system',
@@ -105,21 +105,19 @@ export class ChatMessageService {
    sendTo?: string)
   {
     if (sendFrom === 'System') return this.systemSend(chatTab, text);
-    let name,newTo :string;
+    let name :string;
     if (sendTo) {
-      newTo = this.findId(sendTo);
-      name = this.makeMessageName(PeerCursor.myCursor.name , sendTo);
+      name = this.makeMessageName(this.playerService.myPlayer.name , sendTo);
     }
     else {
-      name = PeerCursor.myCursor.name;
-      newTo = "";
+      name = this.playerService.myPlayer.name ;
     }
     this.standService.cutIn(text,sendTo);
     let chatMessage: ChatMessageContext = {
-      from: Network.peerContext.userId,
-      to: newTo,
+      from: this.playerService.myPlayer.playerId,
+      to: sendTo,
       name: name,
-      imageIdentifier: PeerCursor.myCursor?.imageIdentifier,
+      imageIdentifier: this.playerService.myImage.identifier,
       timestamp: this.calcTimeStamp(chatTab),
       tag: gameType,
       text: StringUtil.cr(text),
@@ -138,45 +136,32 @@ export class ChatMessageService {
   }
 
   get myColor(): string {
-    if (PeerCursor.myCursor
-      && PeerCursor.myCursor.color
-      && PeerCursor.myCursor.color != PeerCursor.CHAT_TRANSPARENT_COLOR) {
-      return PeerCursor.myCursor.color;
-    }
-    return PeerCursor.CHAT_DEFAULT_COLOR;
+     return this,this.playerService.myColor;
   }
 
   colorValidation(color :string):string {
-    return color !== PeerCursor.CHAT_DEFAULT_COLOR ? color : ""; 
-  }
-
-  getPeer(identifier: string): PeerCursor {
-    return ObjectStore.instance.get(identifier) as PeerCursor;
-  }
-
-  findId(identifier: string): string {
-    return this.getPeer(identifier)?.userId;
+    return color !== this.playerService.CHAT_WHITETEXT_COLOR ? color : ""; 
   }
 
   private makeMessageName(name: string, sendTo: string): string {
-    return name + ' ➡ ' + this.getPeer(sendTo)?.name;
+    return name + ' ➡ ' + this.playerService.getPlayerById(sendTo).name;
   }
 
   sendOperationLog(text: string, logType: string) {
     switch (logType) {
       case "dice":
-        if (!this.playerService.roomAdmin.diceLog) return;
+        if (!this.roomService.roomAdmin.diceLog) return;
         break;
       case "card":
-        if (!this.playerService.roomAdmin.cardLog) return;
+        if (!this.roomService.roomAdmin.cardLog) return;
         break;
       default:
         return;
         break;
     }
-    let chatTab = ObjectStore.instance.get<ChatTab>(this.playerService.roomAdmin.chatTab)
+    let chatTab = ObjectStore.instance.get<ChatTab>(this.roomService.roomAdmin.chatTab)
     if (chatTab) 
-     this.playerSend(chatTab ,text , "", Network.peerContext.userId ,"");
+     this.playerSend(chatTab ,text , "", this.playerService.myPlayer.playerId ,"");
   }
 
 }

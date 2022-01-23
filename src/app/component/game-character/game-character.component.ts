@@ -14,7 +14,7 @@ import {
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { ObjectNode } from '@udonarium/core/synchronize-object/object-node';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
-import { EventSystem, Network } from '@udonarium/core/system';
+import { EventSystem } from '@udonarium/core/system';
 import { GameCharacter } from '@udonarium/game-character';
 import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { GameCharacterSheetComponent } from 'component/game-character-sheet/game-character-sheet.component';
@@ -25,7 +25,6 @@ import { RotableOption } from 'directive/rotable.directive';
 import { ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
-import { PeerCursor } from '@udonarium/peer-cursor';
 import { StringUtil } from '@udonarium/core/system/util/string-util';
 import { ImageStorage } from '@udonarium/core/file-storage/image-storage';
 import { ModalService } from 'service/modal.service';
@@ -377,7 +376,7 @@ export class GameCharacterComponent implements OnInit, OnDestroy, AfterViewInit 
   }
 
   get dialogColor(): string {
-    return (this.dialog && this.dialog.color) ? this.dialog.color : PeerCursor.CHAT_DEFAULT_COLOR;
+    return (this.dialog && this.dialog.color) ? this.dialog.color : this.playerService.CHAT_BLACKTEXT_COLOR;
   }
 
   movableOption: MovableOption = {};
@@ -688,7 +687,7 @@ export class GameCharacterComponent implements OnInit, OnDestroy, AfterViewInit 
         {
           name: '個人インベントリ', action: () => {
             EventSystem.call('FAREWELL_STAND_IMAGE', { characterIdentifier: this.gameCharacter.identifier });
-            this.gameCharacter.setLocation(Network.peerId);
+            this.gameCharacter.setLocation(this.playerService.myPlayer.playerId);
             SoundEffect.play(PresetSound.piecePut);
           }
         },

@@ -1,15 +1,16 @@
-import { Component, OnInit,Input ,Output ,EventEmitter, ViewChild, AfterViewInit , ElementRef,ChangeDetectorRef } from '@angular/core';
-import { PlayerService } from 'service/player.service';
+import { Component, OnInit, OnDestroy, Input, Output, EventEmitter, ViewChild, AfterViewInit, ElementRef, ChangeDetectorRef } from '@angular/core';
+import { Player } from '@udonarium/player';
 import { DiceBotService } from 'service/dice-bot.service';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
-import { PeerCursor } from '@udonarium/peer-cursor';
 import { PanelOption, PanelService } from 'service/panel.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { TextViewComponent } from 'component/text-view/text-view.component';
 import { GameCharacter } from '@udonarium/game-character';
 import { GameCharacterService } from 'service/game-character.service';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService} from 'service/context-menu.service';
+import { PlayerService } from 'service/player.service';
 import { StandSettingComponent } from 'component/stand-setting/stand-setting.component';
+import { EventSystem } from '@udonarium/core/system';
 
 interface chatDataContext {
   sendTo : string;
@@ -24,7 +25,7 @@ interface chatDataContext {
   templateUrl: './chat-input-setting.component.html',
   styleUrls: ['./chat-input-setting.component.css']
 })
-export class ChatInputSettingComponent implements OnInit,AfterViewInit {
+export class ChatInputSettingComponent implements OnInit,AfterViewInit, OnDestroy {
 
   @ViewChild('setting') settingDOM: ElementRef;
   myWindow:HTMLElement;
@@ -65,8 +66,8 @@ export class ChatInputSettingComponent implements OnInit,AfterViewInit {
     }
     else this.chatData.isCharacter = false;
     this.chatSetting.emit(this.chatData);
-    setTimeout(() => { this.canVisible()}, 500);
-  }
+    this.canVisible();
+  };
   get character(): GameCharacter { return this._character; }
 
   get sendTo(): string { return this.chatData.sendTo };
@@ -86,7 +87,13 @@ export class ChatInputSettingComponent implements OnInit,AfterViewInit {
   isStandPos:boolean = false;
   isColor:boolean = false;
   canVisible() {
-    let canDisplayCount: number = this.windowWidth < 190 ? 1 : 2;
+    let canDisplayCount: number;
+    if (this.myWindow || this.settingDOM?.nativeElement) {
+        this.myWindow = this.settingDOM.nativeElement as HTMLElement;
+        canDisplayCount = this.windowWidth < 190 ? 1 : 2;
+    }
+    else canDisplayCount = 2;      
+    
     let count: number = 0;
     if (!this.character) this.sortVisible(canDisplayCount);
     for (let item = 0; item < this.visibleList.length ; item++) {
@@ -180,14 +187,10 @@ export class ChatInputSettingComponent implements OnInit,AfterViewInit {
     this.setVisible("standPos");
   }
 
-  get myPeer(): PeerCursor { return this.playerService.myPeer; }
-  get otherPeers(): PeerCursor[] { return this.playerService.otherPeers; }
+  get myPlayer(): Player { return this.playerService.myPlayer; }
+  get otherPlayers(): Player[] { return this.playerService.otherPlayers; }
   get sendToColor(): string {
-    let object = ObjectStore.instance.get(this.sendTo);
-    if (object instanceof PeerCursor) {
-      return object.color;
-    }
-    return PeerCursor.CHAT_DEFAULT_COLOR;
+    return this.playerService.getPlayerById(this.sendTo).color
   }
 
 
@@ -244,11 +247,17 @@ export class ChatInputSettingComponent implements OnInit,AfterViewInit {
       && this.character.chatPalette.paletteColor) {
       return this.character.chatPalette.paletteColor;
     }
-    return PeerCursor.CHAT_TRANSPARENT_COLOR; 
+    return this.playerService.CHAT_WHITETEXT_COLOR;
   }
 
   set paletteColor(color: string) {
-    this.character.chatPalette.color = color ? color : PeerCursor.CHAT_TRANSPARENT_COLOR;
+    this.character.chatPalette.color = color ? color : this.playerService.CHAT_WHITETEXT_COLOR;
+  }
+
+  waitLoadDiceBot() {
+    this.loadDiceBot(this.gameType);
+    this.chatData.gameType = this.gameType;
+    this.chatSetting.emit(this.chatData);
   }
 
   constructor(
@@ -264,6 +273,8 @@ export class ChatInputSettingComponent implements OnInit,AfterViewInit {
   ngAfterViewInit() {
     this.myWindow = this.settingDOM.nativeElement as HTMLElement;
     if (this.gameType) this.loadDiceBot(this.gameType);
+     EventSystem.register(this)
+      .on('DICEBOT_LOAD', event => { this.waitLoadDiceBot() });
     setTimeout(() => {
       this.viewInit();
     }, 100);
@@ -275,6 +286,10 @@ export class ChatInputSettingComponent implements OnInit,AfterViewInit {
   }
 
   ngOnInit(): void {
+  }
+
+  ngOnDestroy() {
+    EventSystem.unregister(this);
   }
 
 }

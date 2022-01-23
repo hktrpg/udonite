@@ -2,9 +2,9 @@ import { Component, OnDestroy, OnInit ,Input ,Output ,EventEmitter} from '@angul
 
 import { PeerContext } from '@udonarium/core/system/network/peer-context';
 import { EventSystem, Network } from '@udonarium/core/system';
+import { FileArchiver } from '@udonarium/core/file-storage/file-archiver';
 import { DiceBotService } from 'service/dice-bot.service';
-import { PlayerService } from 'service/player.service';
-import { RoomService } from 'service/room.service';
+import { RoomService , RoomState } from 'service/room.service';
 
 @Component({
   selector: 'room-setting',
@@ -15,12 +15,8 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
   peers: PeerContext[] = [];
   isReloading: boolean = false;
 
-  @Input() isRoomCreate:boolean = true;
-  @Output() isRoomCreateChange = new EventEmitter<boolean>();  
-
-  cancel() {
-    this.isRoomCreate = false;
-    this.isRoomCreateChange.emit(false);
+  close() {
+    this.roomService.roomState = RoomState.LOBBY;
   }
 
   roomName: string = 'ふつうの部屋';
@@ -28,7 +24,7 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
   isPrivate: boolean = false;
 
   roomAdmin:boolean = false;
-  adminPassword:string = "";
+  roomFile:FileList;
 
   get peerId(): string { return Network.peerId; }
   get isConnected(): boolean { return Network.peerIds.length <= 1 ? false : true; }
@@ -38,7 +34,6 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
   get diceBotInfosIndexed() { return this.diceBotService.diceBotInfosIndexed }
 
   constructor(
-    private playerService: PlayerService,
     private diceBotService: DiceBotService,
     private roomService: RoomService,
   ) { }
@@ -59,7 +54,16 @@ export class RoomSettingComponent implements OnInit, OnDestroy {
   }
 
   createRoom() {
-    this.roomService.create(this.roomName, this.password, this.adminPassword);
-    this.roomService.isLobby = false;
+    if (this.roomFile) {
+      FileArchiver.instance.load(this.roomFile);
+      this.roomFile = null;
+    }
+    this.roomService.create(this.roomName, this.password, this.roomAdmin);
+    this.roomService.roomState = RoomState.PLAYER_SELECT;
+  }
+
+  handleFileSelect(event :Event) {
+    let input = <HTMLInputElement>event.target;
+    if (input.files.length) this.roomFile = input.files;
   }
 }

@@ -1,8 +1,9 @@
 import { Component, OnInit, OnDestroy, Input ,Output ,EventEmitter} from '@angular/core';
 import { GameCharacter } from '@udonarium/game-character';
-import { PeerCursor } from '@udonarium/peer-cursor';
 import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { GameCharacterService } from 'service/game-character.service';
+import { PlayerService } from 'service/player.service';
+import { Player } from '@udonarium/player';
 
 @Component({
   selector: 'chat-input-sendfrom',
@@ -12,6 +13,7 @@ import { GameCharacterService } from 'service/game-character.service';
 export class ChatInputSendfromComponent implements OnInit ,OnDestroy {
 
   @Input('isLock') isLock: boolean = false;
+  @Input('isBlack') isBlack: boolean = true;
   private _sendFrom:string;
   @Input('sendFrom') set sendFrom(sendFrom: string) {
     this._sendFrom = sendFrom;
@@ -31,17 +33,18 @@ export class ChatInputSendfromComponent implements OnInit ,OnDestroy {
     this.touched = true;
   }
 
-  get myPeer(): PeerCursor { return PeerCursor.myCursor; }
-
   isUseFaceIcon: boolean = true;  
   character: GameCharacter; 
+  get player():Player {
+    return this.playerService.myPlayer;
+  }
 
   get imageFile(): ImageFile {
     let image: ImageFile = null;
     if (this.character) {
       image = this.character.imageFile;
-    } else if (this.myPeer.image) {
-      image = this.myPeer.image;
+    } else if (this.playerService.myImage) {
+      image = this.playerService.myImage
     }
     return image ? image : ImageFile.Empty;
   }
@@ -55,24 +58,26 @@ export class ChatInputSendfromComponent implements OnInit ,OnDestroy {
     return this.gameCharacterService.list(onlyTable);
   }  
 
+  colorValication(color :string) :string {
+    return (color == Player.CHAT_WHITETEXT_COLOR && !this.isBlack) ? Player.CHAT_BLACKTEXT_COLOR : color;
+  }
+
   getColor():string {
+    let color:string = Player.CHAT_WHITETEXT_COLOR;
     if(this.character) {
-      return this.gameCharacterService.color(this.sendFrom);
+      color = this.gameCharacterService.color(this.sendFrom) 
     }
-    else return this.myColor;
+    else color = this.myColor;
+    return this.colorValication(color);
   }
 
   get myColor(): string {
-    if (PeerCursor.myCursor
-      && PeerCursor.myCursor.color
-      && PeerCursor.myCursor.color != PeerCursor.CHAT_TRANSPARENT_COLOR) {
-      return PeerCursor.myCursor.color;
-    }
-    return PeerCursor.CHAT_DEFAULT_COLOR;
-  }
+    return this.playerService.myColor;
+   }
 
   constructor(
-    private gameCharacterService: GameCharacterService
+    private gameCharacterService: GameCharacterService,
+    private playerService: PlayerService
   ) {     
     
   }

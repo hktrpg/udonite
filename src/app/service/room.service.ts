@@ -1,26 +1,123 @@
 import { Injectable } from '@angular/core';
 import { PeerContext } from '@udonarium/core/system/network/peer-context';
 import { PeerCursor } from '@udonarium/peer-cursor';
+import { RoomAdmin } from '@udonarium/room-admin';
 import { EventSystem, Network } from '@udonarium/core/system';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
 import { PlayerService } from 'service/player.service';
+import * as SHA256 from 'crypto-js/sha256';
+import { Player } from '@udonarium/player';
+import { GameTable } from '@udonarium/game-table';
+import { TableSelecter } from '@udonarium/table-selecter';
+
+export const RoomState = {
+  LOBBY: 0,
+  PASSWORD: 1,
+  CREATE: 2,
+  PLAYER_SELECT: 3,
+  PLAY: 4
+} as const;
+export type RoomState = typeof RoomState[keyof typeof RoomState]; 
 
 @Injectable({
   providedIn: 'root'
 })
 export class RoomService {
 
-  isLobby:boolean = true;
+  _roomState:RoomState = RoomState.LOBBY;
+  get roomState():RoomState {return this._roomState}
+  set roomState(roomState :RoomState) {
+    if (roomState === RoomState.PLAY) RoomAdmin.setting.isLobby = false;
+    this._roomState = roomState;
+  }
+  isStandalone:boolean = false;
 
   constructor(
     private playerService: PlayerService,
   ) { }
 
-  create(roomName: string ,password: string ,adminPassword?: string) {
+  get allPlayers():Player[] {
+    return RoomAdmin.players;
+  }
+
+  //権限管理
+
+  getHash(password: string) {
+    return SHA256(password).toString();
+  }
+  
+  enableAdmin() {
+    this.roomAdmin.adminPlayer.push(this.playerService.myPlayer.playerId);
+  }
+   
+  get roomAdmin():RoomAdmin {
+    return RoomAdmin.setting;
+  }
+  
+  get adminAuth():boolean {
+    return RoomAdmin.auth;
+  }
+  
+  get disableRoomLoad():boolean {
+     return this.roomAdmin.disableRoomLoad as boolean;
+  }
+  
+  get disableObjectLoad():boolean {
+    if  (this.adminAuth) return false;
+    return this.roomAdmin.disableObjectLoad as boolean;
+  }
+
+  get disableTabletopLoad():boolean {
+    if  (this.adminAuth) return false;
+    return this.roomAdmin.disableTabletopLoad as boolean;
+  }
+  
+  get disableImageLoad():boolean {
+    if  (this.adminAuth) return false;
+    return this.roomAdmin.disableImageLoad as boolean;
+  }
+
+  get disableAudioLoad():boolean {
+    if  (this.adminAuth) return false;
+    return this.roomAdmin.disableAudioLoad as boolean;
+  }
+  
+  get disableTableSetting():boolean {
+    if  (this.adminAuth) return false;
+    return this.roomAdmin.disableTableSetting as boolean;
+  }
+  get disableTabSetting():boolean {
+    if  (this.adminAuth) return false;
+    return this.roomAdmin.disableTabSetting as boolean;
+  }
+  get disableAllDataSave():boolean {
+    if  (this.adminAuth) return false;
+    return this.roomAdmin.disableAllDataSave as boolean;
+  }
+  get disableSeparateDataSave():boolean{
+    if  (this.adminAuth) return false;
+    return this.roomAdmin.disableSeparateDataSave as boolean;
+  }
+ 
+   //ルーム作成
+  roomInit() {
+    let tableSelecter = new TableSelecter('tableSelecter');
+    tableSelecter.initialize();
+    let gameTable = new GameTable('gameTable');
+    gameTable.name = '最初のテーブル';
+    gameTable.imageIdentifier = "testTableBackgroundImage_image";
+    gameTable.width = 20;
+    gameTable.height = 15;
+    gameTable.initialize();
+
+    tableSelecter.viewTableIdentifier = gameTable.identifier;
+  }
+
+  create(roomName: string ,password: string ,admin?: boolean) {
     let userId = Network.peerContext ? Network.peerContext.userId : PeerContext.generateId();
     Network.open(userId, PeerContext.generateId('***'), roomName, password);
     PeerCursor.myCursor.peerId = Network.peerId;
-    if (adminPassword) this.playerService.enableAdmin(adminPassword); 
+    if (admin) this.enableAdmin(); 
   }
 
   connect(peerContexts :PeerContext[], password? :string) {
@@ -42,11 +139,12 @@ export class RoomService {
             console.log('接続成功！', event.data.peerId);
             triedPeer.push(event.data.peerId);
             console.log('接続成功 ' + triedPeer.length + '/' + peerContexts.length);
-            this.isLobby = false;
             if (peerContexts.length <= triedPeer.length) {
               this.resetNetwork();
+              this.roomState = RoomState.LOBBY;
               EventSystem.unregister(triedPeer);
             }
+            this.roomState = RoomState.PLAYER_SELECT;
           })
           .on('DISCONNECT_PEER', event => {
             console.warn('接続失敗', event.data.peerId);
@@ -54,6 +152,7 @@ export class RoomService {
             console.warn('接続失敗 ' + triedPeer.length + '/' + peerContexts.length);
             if (peerContexts.length <= triedPeer.length) {
               this.resetNetwork();
+              this.roomState = RoomState.LOBBY;
               EventSystem.unregister(triedPeer);
             }
           });
@@ -65,6 +164,37 @@ export class RoomService {
       Network.open();
       PeerCursor.myCursor.peerId = Network.peerId;
     }
+  }
+
+  //部屋の読み込み
+  loadRoom(roomData :RoomAdmin) {
+    let dataHasPlayer:boolean = false;
+    for (let data of roomData.children) {
+      if (data instanceof RoomAdmin) {
+        RoomAdmin.setting.chatTab = data.chatTab;
+        RoomAdmin.setting.cardLog = data.cardLog;
+        RoomAdmin.setting.diceLog = data.diceLog;
+      }
+      else if (data instanceof Player){
+        dataHasPlayer = true;
+        let player = new Player();
+        player.initialize();
+        for (let key in data) {
+          if (key === 'identifier') continue;
+          if (key === 'paletteList' || key === 'peerIdentifier') continue;
+          if (key === 'authType') {
+            player.setAttribute(key, Number(data[key]));
+          }
+          if (data[key] == null || data[key] === '') continue;
+          else {
+            player.setAttribute(key, data[key]);
+          }
+        }
+        RoomAdmin.instance.appendChild(player);
+      }
+    }
+    roomData.destroy;
+    //if (dataHasPlayer) EventSystem.call('PLAYER_LOADED',null)
   }
 
 }

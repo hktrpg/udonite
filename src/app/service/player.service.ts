@@ -1,20 +1,37 @@
 import { Injectable } from '@angular/core';
+import { ImageFile } from '@udonarium/core/file-storage/image-file';
 import { PeerCursor } from '@udonarium/peer-cursor';
 import { PeerContext } from '@udonarium/core/system/network/peer-context';
+import { Player } from '@udonarium/player';
 import { RoomAdmin } from '@udonarium/room-admin';
 import { ChatPalette } from '@udonarium/chat-palette';
 import { ObjectStore } from '@udonarium/core/synchronize-object/object-store';
-import * as SHA256 from 'crypto-js/sha256';
 
 @Injectable({
   providedIn: 'root'
 })
 export class PlayerService {
-  //パレットバインダー
-  //最終的にはプレイヤークラスを作ってそこで管理すべき
+  //定義
+  CHAT_MY_NAME_LOCAL_STORAGE_KEY = 'udonanaumu-chat-my-name-local-storage';
+  CHAT_MY_COLOR_LOCAL_STORAGE_KEY = 'udonanaumu-chat-my-color-local-storage';
+  KEY_PHRASE_LOCAL_STORAGE_KEY = 'kake-udon-keyphrase-local-storage';
+  
+  CHAT_WHITETEXT_COLOR = Player.CHAT_WHITETEXT_COLOR;
+  CHAT_BLACKTEXT_COLOR = Player.CHAT_BLACKTEXT_COLOR;
+
+  
+  myPlayer:Player;
+  
+  //プレイヤーパレット
   localpalette: ChatPalette;
-  paletteList: string[] = [];
   myPalette = null;
+  
+  get paletteList() {
+    return this.myPlayer.paletteList;
+  }
+  set paletteList(paletteList :string[]) {
+    this.myPlayer.paletteList = paletteList;
+  }
 
   addList(identifier: string) {
     if (this.checkList(identifier)) { return }
@@ -34,63 +51,54 @@ export class PlayerService {
     return false; 
   }
 
-  //権限管理 将来的にこれも独立したほうがいいかも
-
-  getHash(password: string) {
-    return SHA256(password).toString();
+  playerCreate(imageIdentifier :string) {
+    let player = new Player();
+    player.initialize();
+    player.isInitial = true;
+    player.name =  (window.localStorage && localStorage.getItem(this.CHAT_MY_NAME_LOCAL_STORAGE_KEY)) ?
+      localStorage.getItem(this.CHAT_MY_NAME_LOCAL_STORAGE_KEY) :
+      "プレイヤー" ;
+    player.color = (window.localStorage && localStorage.getItem(this.CHAT_MY_COLOR_LOCAL_STORAGE_KEY)) ?
+      localStorage.getItem(this.CHAT_MY_COLOR_LOCAL_STORAGE_KEY) :
+      this.CHAT_WHITETEXT_COLOR ;
+    player.imageIdentifier = imageIdentifier;
+    player.playerId = PeerContext.generateId();
+    RoomAdmin.instance.appendChild(player);
+    PeerCursor.createMyCursor(player.identifier);
+    this.myPlayer = player;
+    return player;
   }
-
-  enableAdmin(text :string) {
-    RoomAdmin.instance.adminPassword = this.getHash(text);
-    RoomAdmin.instance.adminPeers.push(this.myPeer.identifier);
-  }
-
-  adminPasswordAuth(text :string) {
-   if (this.roomAdmin.adminPassword == this.getHash(text)) {
-     RoomAdmin.instance.adminPeers.push(this.myPeer.identifier);
-   }
-  } 
-
-  get roomAdmin():RoomAdmin {
-    return RoomAdmin.instance;
-  }
-
-  get adminAuth():boolean {
-    if (this.roomAdmin.adminPeers.includes(this.myPeer.identifier)) return true;
-    return false;
-  }
-
-  get disableTableLoad():boolean {
-    if  (this.adminAuth) return false;
-    return this.roomAdmin.disableTableLoad as boolean;
-  }
-
-  get disableCharacterLoad():boolean {
-    if  (this.adminAuth) return false;
-    return this.roomAdmin.disableCharacterLoad as boolean;
-  }
-  get disableTableSetting():boolean {
-    if  (this.adminAuth) return false;
-    return this.roomAdmin.disableTableSetting as boolean;
-  }
-  get disableTabSetting():boolean {
-    if  (this.adminAuth) return false;
-    return this.roomAdmin.disableTabSetting as boolean;
-  }
-  get disableAllDataSave():boolean {
-    if  (this.adminAuth) return false;
-    return this.roomAdmin.disableAllDataSave as boolean;
-  }
-  get disableSeparateDataSave():boolean{
-    if  (this.adminAuth) return false;
-    return this.roomAdmin.disableSeparateDataSave as boolean;
-  }
-
 
 
   //ユーザー管理
+
+  get myImage():ImageFile {
+    if (this.myPlayer
+      && this.myPlayer.image
+      && this.myPlayer.image.url.length > 0) {
+      return this.myPlayer.image;
+    }  
+    return ImageFile.Empty;
+  }
+
+  get myColor():string {
+    if (this.myPlayer
+      && this.myPlayer.color) {
+      return this.myPlayer.color;
+    }
+    return this.CHAT_WHITETEXT_COLOR;
+  }
+
   get myPeer(): PeerCursor { return PeerCursor.myCursor; }
+  get myPeerIdentifier(): string { return this.myPeer.identifier; }
   get otherPeers(): PeerCursor[] { return ObjectStore.instance.getObjects(PeerCursor); }
+
+  get otherPlayers(): Player[] {
+    return this.otherPeers.map(peer => {
+      return peer.player;
+    });
+  }
+
   getPeer(identifier :string): PeerCursor {
     let object = ObjectStore.instance.get(identifier);
     if (object instanceof PeerCursor) {
@@ -98,6 +106,13 @@ export class PlayerService {
     }
     return null;
   }
+ 
+  getPlayerById(playerId :string): Player {
+    return this.otherPeers.find( peer => 
+      peer.player.playerId === playerId
+    ).player;
+  }
+
   getPeerId(identifier :string): string {
     let peer = this.getPeer(identifier);
     if (peer) {
@@ -110,8 +125,8 @@ export class PlayerService {
   findPeerNameAndColor(peerId: string):{ name: string, color: string } {
     let peer = PeerCursor.findByPeerId(peerId);
       return {
-        name: (peer ? peer.name : ''),
-        color: (peer ? peer.color : PeerCursor.CHAT_TRANSPARENT_COLOR),
+        name: (peer ? peer.player.name : ''),
+        color: (peer ? peer.player.color : this.CHAT_WHITETEXT_COLOR),
       };
   }
 

@@ -13,6 +13,7 @@ import { PresetSound, SoundEffect } from '@udonarium/sound-effect';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
+import { GameCharacterService } from './game-character.service';
 
 import { ContextMenuAction } from './context-menu.service';
 import { PointerCoordinate } from './pointer-device.service';
@@ -24,10 +25,12 @@ import { ImageTag } from '@udonarium/image-tag';
 })
 export class TabletopActionService {
 
-  constructor() { }
+  constructor(
+    private gameCharacterService: GameCharacterService
+  ) { }
 
   createGameCharacter(position: PointerCoordinate): GameCharacter {
-    let character = GameCharacter.create('新しいキャラクター', 1, '');
+    let character = this.gameCharacterService.create('新しいキャラクター','');
     character.location.x = position.x - 25;
     character.location.y = position.y - 25;
     character.posZ = position.z;
@@ -69,7 +72,7 @@ export class TabletopActionService {
   }
 
   createTextNote(position: PointerCoordinate): TextNote {
-    let textNote = TextNote.create('共有メモ', 'テキストを入力してください', 5, 4, 3);
+    let textNote = TextNote.create('共有メモ', 'テキストを入力してください', 5, 4, 3,0);
     textNote.location.x = position.x;
     textNote.location.y = position.y;
     textNote.posZ = position.z;
@@ -167,31 +170,6 @@ export class TabletopActionService {
       cardStack.putOnBottom(card);
     }
     return cardStack;
-  }
-
-  makeDefaultTable() {
-    let tableSelecter = new TableSelecter('tableSelecter');
-    tableSelecter.initialize();
-
-    let gameTable = new GameTable('gameTable');
-    let testBgFile: ImageFile = null;
-    let bgFileContext = ImageFile.createEmpty('testTableBackgroundImage_image').toContext();
-    bgFileContext.url = './assets/images/BG10a_80.jpg';
-    testBgFile = ImageStorage.instance.add(bgFileContext);
-    ImageTag.create(testBgFile.identifier).tag = '*default テーブル';
-    gameTable.name = '最初のテーブル';
-    gameTable.imageIdentifier = testBgFile.identifier;
-    gameTable.width = 20;
-    gameTable.height = 15;
-    gameTable.initialize();
-
-    tableSelecter.viewTableIdentifier = gameTable.identifier;
-  }
-
-  makeDefaultTabletopObjects() {
-    let testCharacter: GameCharacter = null;
-    let testFile: ImageFile = null;
-    let fileContext: ImageContext = null;
   }
 
   makeDefaultContextMenuActions(position: PointerCoordinate): ContextMenuAction[] {

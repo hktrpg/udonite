@@ -13,36 +13,31 @@
     </div>
   </div>
   <div class="item" style="height:50px;" *ngIf="isEdit">
-    <div class="password-box" *ngIf=
-     "(dataType && ( !card || !card?.ownerPassword ))">
-      <div class="password">
-        <label class="control-text">オーナーパスワード</label>
-        <input class="control-text" style="height: 1em;width: 9em;" type="text" [(ngModel)]="password">
-      </div>
-      <div class="small-text" style="color:pink;">必須！
-      </div>
-    </div>
     <div class="peer-select" *ngIf='dataType == 2'>
       <label>許可するプレイヤー</label >
-      <select style="max-width: 10em" [(ngModel)]="peer">
-          <option *ngFor="let peer of otherPeers" value="{{peer.identifier}}" [style.color]="peer.color">{{peer.name}}
+      <select style="max-width: 10em" [(ngModel)]="player">
+          <option *ngFor="let player of playerService.otherPlayers" value="{{player.playerId}}" [style.color]="player.color">{{player.name}}
           </option>
       </select>
-      <button class="control-text" (click)="addPeer()">追加</button>
+      <button class="control-text" (click)="addPlayer()">追加</button>
+    </div>
+    <div class="type-select">
+      <label>
+        <input name="type-select" type="checkbox" [(ngModel)]="isImage">
+        <div><div></div></div>
+      </label>
     </div>
   </div>
-  <div class="item">
-    <form>
-      <textarea name="textArea" rows="20" cols="65" [readOnly]="!isEdit"  placeholder="本文" [(ngModel)]="text"></textarea>
-    </form>
-  </div>
+  <ng-container *ngIf="!isImage ;else imageBox">
+    <div class="item">
+      <form>
+        <textarea name="textArea" rows="20" cols="65" [readOnly]="!isEdit"  placeholder="本文" [(ngModel)]="text"></textarea>
+      </form>
+    </div>
+  </ng-container>
   <div class="control">
-    <div class="auth" *ngIf="( !isEdit && (readOnly || isSecret) ); else nullspace">
-      <div class="password">
-        <label class="control-text">オーナーパスワード</label>
-        <input class="control-text" style="height: 1em;width: 8em;" type="text" [(ngModel)]="password">
-      </div>
-      <button class="control-text" (click)="passwordAuth()">認証</button>
+    <div>
+      <p></p>
     </div>
     <div class="buttons">
       <button *ngIf="isEdit&&!card" class="control-text" (click)="create()" >作成</button>
@@ -60,12 +55,19 @@
 </div>
 
 
-<ng-template #nullspace>
-  <p>　</p>
-</ng-template>
 <ng-template #showTitle>
   <span class="title">{{title}}</span>
 </ng-template>
 <ng-template #showAuthority>
   <span style="font-size:14px">{{authType[dataType]}}</span>
+</ng-template>
+<ng-template #imageBox>
+  <div class="imageEdit" *ngIf="isEdit ;else image" [style.background-image]="'url(' + imageurl + ')' | safe: 'style' ">
+    <button (click)="changeImage()">変更</button>
+  </div>
+</ng-template>
+<ng-template #image>
+  <div class="image-area" (click)="viewImg()">
+    <img class="image" [src]="imageurl | safe: 'resourceUrl'" />
+  </div>
 </ng-template>

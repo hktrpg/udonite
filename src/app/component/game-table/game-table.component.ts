@@ -13,14 +13,17 @@ import { PeerCursor } from '@udonarium/peer-cursor';
 import { TableSelecter } from '@udonarium/table-selecter';
 import { Terrain } from '@udonarium/terrain';
 import { TextNote } from '@udonarium/text-note';
+import { Popup } from '@udonarium/popup';
 
 import { GameTableSettingComponent } from 'component/game-table-setting/game-table-setting.component';
+import { PopupEditComponent } from 'component/popup-edit/popup-edit.component';
 import { ContextMenuAction, ContextMenuSeparator, ContextMenuService } from 'service/context-menu.service';
 import { CoordinateService } from 'service/coordinate.service';
 import { ImageService } from 'service/image.service';
 import { ModalService } from 'service/modal.service';
 import { PointerDeviceService } from 'service/pointer-device.service';
 import { TabletopActionService } from 'service/tabletop-action.service';
+import { RoomService } from 'service/room.service';
 import { TabletopService } from 'service/tabletop.service';
 
 import { GridLineRender } from './grid-line-render';
@@ -77,6 +80,8 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
   get textNotes(): TextNote[] { return this.tabletopService.textNotes; }
   get diceSymbols(): DiceSymbol[] { return this.tabletopService.diceSymbols; }
   get peerCursors(): PeerCursor[] { return this.tabletopService.peerCursors; }
+  get popups(): Popup[] { return this.tabletopService.popups;
+   }
 
   constructor(
     private ngZone: NgZone,
@@ -84,6 +89,7 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     private pointerDeviceService: PointerDeviceService,
     private coordinateService: CoordinateService,
     private imageService: ImageService,
+    private roomService: RoomService,
     private tabletopService: TabletopService,
     private tabletopActionService: TabletopActionService,
     private modalService: ModalService,
@@ -124,8 +130,6 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
         }, 50);
         this.removeFocus();
       });
-    this.tabletopActionService.makeDefaultTable();
-    this.tabletopActionService.makeDefaultTabletopObjects();
   }
 
   private _rightRotate(rotate: number, just: boolean=false): number {
@@ -263,10 +267,18 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     Array.prototype.push.apply(menuActions, this.tabletopActionService.makeDefaultContextMenuActions(objectPosition));
     menuActions.push(ContextMenuSeparator);
     menuActions.push({
-      name: 'テーブル設定', action: () => {
-        this.modalService.open(GameTableSettingComponent);
+      name: 'メッセージを送信', action: () => {
+        this.showPopup(objectPosition.x, objectPosition.y, objectPosition.z);
       }
     });
+    if (!this.roomService.disableTableSetting) {
+      menuActions.push(ContextMenuSeparator);
+      menuActions.push({
+        name: 'テーブル設定', action: () => {
+          this.modalService.open(GameTableSettingComponent);
+        }
+      });
+    }
     this.contextMenuService.open(menuPosition, menuActions, this.currentTable.name);
   }
 
@@ -324,6 +336,11 @@ export class GameTableComponent implements OnInit, OnDestroy, AfterViewInit {
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
+  }
+
+  private showPopup(x: number , y: number , z: number) {
+    let modal = this.modalService.open(PopupEditComponent, { x: x ,y: y,z: z});
+    
   }
 
   trackByGameObject(index: number, gameObject: GameObject) {

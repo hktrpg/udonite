@@ -10,6 +10,7 @@ import { ChatMessageService } from 'service/chat-message.service';
 import { ModalService } from 'service/modal.service';
 import { PanelService } from 'service/panel.service';
 import { PlayerService } from 'service/player.service';
+import { RoomService } from 'service/room.service';
 import { SaveDataService } from 'service/save-data.service';
 import { SaveHtmlService } from 'service/save-html.service';
 
@@ -33,7 +34,7 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
   get isDeleted(): boolean { return this.selectedTab ? ObjectStore.instance.get(this.selectedTab.identifier) == null : false; }
   get isEditable(): boolean { return !this.isEmpty && !this.isDeleted; }
 
-  get disableTabSetting(): boolean { return this.playerService.disableTabSetting; }
+  get disableTabSetting(): boolean { return this.roomService.disableTabSetting; }
   isSaveing: boolean = false;
   progresPercent: number = 0;
 
@@ -53,6 +54,7 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
     private modalService: ModalService,
     private panelService: PanelService,
     private playerService: PlayerService,
+    public roomService: RoomService,
     private chatMessageService: ChatMessageService,
     private saveDataService: SaveDataService,
     private saveHtmlService: SaveHtmlService
@@ -103,6 +105,15 @@ export class ChatTabSettingComponent implements OnInit, OnDestroy {
       this.isSaveing = false;
       this.progresPercent = 0;
     }, 500);
+  }
+  logClear() {
+    if (!this.isEmpty && this.selectedTab) {
+      if (confirm('選択したタブのログを全て削除します。このまま続行すると復活できません。\nよろしいですか？')) {
+        this.selectedTab.clearAll();
+        let text = "ログは" + this.playerService.myPlayer.name  + "が削除しました";
+        this.chatMessageService.sendMessage(this.selectedTab,text,"","System");
+      }
+    }
   }
 
   delete() {
